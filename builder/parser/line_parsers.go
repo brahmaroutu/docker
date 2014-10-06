@@ -56,6 +56,64 @@ func parseEnv(rest string) (*Node, map[string]bool, error) {
 	return rootnode, nil, nil
 }
 
+func Normalize(list *Node) *Node {
+	for i := 0; i < 100 && list.Value == ""; i++ {
+		list = list.Next
+	}
+	prevNode := list
+	currNode := list
+	for currNode.Next != nil {
+		if currNode.Value == "" {
+			prevNode.Next = currNode.Next
+		} else {
+			prevNode = currNode
+		}
+		currNode = currNode.Next
+		fmt.Println(currNode)
+	}
+	return list
+}
+
+func parseStringsWhitespaceAndQuotesDelimited(strs string) (*Node, map[string]bool, error) {
+	indexes := TOKEN_QUOTES.FindAllStringIndex(strs, -1)
+	var (
+		start, end int
+		is_quoted  bool = false
+		err        error
+	)
+	curr_node := &Node{}
+	start_node := curr_node
+	for _, idx := range indexes {
+		if is_quoted {
+			curr_node.Next = &Node{Value: strs[start:idx[0]]}
+			start = 0
+			end = idx[1]
+			is_quoted = false
+		} else {
+			start = idx[1]
+			is_quoted = true
+			if idx[1] >= end {
+				curr_node.Next, _, err = parseStringsWhitespaceDelimited(strs[end:idx[0]])
+				if err != nil {
+					return nil, nil, err
+				}
+			}
+		}
+		//move to end
+		for curr_node.Next != nil && curr_node != nil {
+			curr_node = curr_node.Next
+		}
+	}
+	if end < len(strs)-1 {
+		curr_node.Next, _, err = parseStringsWhitespaceDelimited(strs[end:])
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+	start_node = Normalize(start_node)
+	return start_node, nil, nil
+}
+
 // parses a whitespace-delimited set of arguments. The result is effectively a
 // linked list of string arguments.
 func parseStringsWhitespaceDelimited(rest string) (*Node, map[string]bool, error) {

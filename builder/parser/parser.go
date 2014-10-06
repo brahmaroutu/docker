@@ -31,6 +31,7 @@ type Node struct {
 var (
 	dispatch                map[string]func(string) (*Node, map[string]bool, error)
 	TOKEN_WHITESPACE        = regexp.MustCompile(`[\t\v\f\r ]+`)
+	TOKEN_QUOTES            = regexp.MustCompile(`[\"|']+`)
 	TOKEN_LINE_CONTINUATION = regexp.MustCompile(`\\$`)
 	TOKEN_COMMENT           = regexp.MustCompile(`^#.*$`)
 )
@@ -50,8 +51,8 @@ func init() {
 		"maintainer":     parseString,
 		"docker-version": parseString,
 		"from":           parseString,
-		"add":            parseStringsWhitespaceDelimited,
-		"copy":           parseStringsWhitespaceDelimited,
+		"add":            parseStringsWhitespaceAndQuotesDelimited,
+		"copy":           parseStringsWhitespaceAndQuotesDelimited,
 		"run":            parseMaybeJSON,
 		"cmd":            parseMaybeJSON,
 		"entrypoint":     parseMaybeJSON,

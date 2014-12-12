@@ -23,8 +23,8 @@
 # the case. Therefore, you don't have to disable it anymore.
 #
 
-FROM ubuntu:14.04
-MAINTAINER Tianon Gravi <admwiggin@gmail.com> (@tianon)
+FROM gccgo-image	
+MAINTAINER	Tianon Gravi <admwiggin@gmail.com> (@tianon)
 
 # Packaged dependencies
 RUN apt-get update && apt-get install -y \
@@ -52,8 +52,11 @@ RUN apt-get update && apt-get install -y \
 	--no-install-recommends
 
 # Get lvm2 source for compiling statically
-RUN git clone -b v2_02_103 https://git.fedorahosted.org/git/lvm2.git /usr/local/lvm2
+RUN	git clone --no-checkout git://git.fedorahosted.org/git/lvm2.git /usr/local/lvm2 && cd /usr/local/lvm2 && git checkout -q v2_02_103
 # see https://git.fedorahosted.org/cgit/lvm2.git/refs/tags for release tags
+# note: we don't use "git clone -b" above because it then spews big nasty warnings about 'detached HEAD' state that we can't silence as easily as we can silence them using "git checkout" directly
+RUN	curl -o /usr/local/lvm2/autoconf/config.guess 'http://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.guess;hb=HEAD'
+RUN	curl -o /usr/local/lvm2/autoconf/config.sub 'http://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.sub;hb=HEAD'
 
 # Compile and install lvm2
 RUN cd /usr/local/lvm2 \
@@ -73,42 +76,48 @@ RUN cd /usr/src/lxc \
 	&& ldconfig
 
 # Install Go
-ENV GO_VERSION 1.4.1
-RUN curl -sSL https://golang.org/dl/go${GO_VERSION}.src.tar.gz | tar -v -C /usr/local -xz \
-	&& mkdir -p /go/bin
-ENV PATH /go/bin:/usr/local/go/bin:$PATH
-ENV GOPATH /go:/go/src/github.com/docker/docker/vendor
-RUN cd /usr/local/go/src && ./make.bash --no-clean 2>&1
+#RUN	curl -sSL https://golang.org/dl/go1.3.3.src.tar.gz | tar -v -C /usr/local -xz
+#ENV	PATH	/usr/local/go/bin:$PATH
+ENV	GOPATH	/go:/go/src/github.com/docker/docker/vendor
+#ENV PATH /go/bin:$PATH
+#RUN	cd /usr/local/go/src && ./make.bash --no-clean 2>&1
 
 # Compile Go for cross compilation
-ENV DOCKER_CROSSPLATFORMS \
-	linux/386 linux/arm \
-	darwin/amd64 darwin/386 \
-	freebsd/amd64 freebsd/386 freebsd/arm \
-	windows/amd64 windows/386
+#ENV	DOCKER_CROSSPLATFORMS	\
+#	linux/386 linux/arm \
+#	darwin/amd64 darwin/386 \
+#	freebsd/amd64 freebsd/386 freebsd/arm 
+#	windows is experimental for now
+#	windows/amd64 windows/386
 
 # (set an explicit GOARM of 5 for maximum compatibility)
-ENV GOARM 5
-RUN cd /usr/local/go/src \
-	&& set -x \
-	&& for platform in $DOCKER_CROSSPLATFORMS; do \
-		GOOS=${platform%/*} \
-		GOARCH=${platform##*/} \
-			./make.bash --no-clean 2>&1; \
-	done
+#ENV GOARM 5
+#RUN cd /usr/local/go/src \
+#	&& set -x \
+#	&& for platform in $DOCKER_CROSSPLATFORMS; do \
+#		GOOS=${platform%/*} \
+#		GOARCH=${platform##*/} \
+#			./make.bash --no-clean 2>&1; \
+#	done
 
 # We still support compiling with older Go, so need to grab older "gofmt"
-ENV GOFMT_VERSION 1.3.3
-RUN curl -sSL https://storage.googleapis.com/golang/go${GOFMT_VERSION}.$(go env GOOS)-$(go env GOARCH).tar.gz | tar -C /go/bin -xz --strip-components=2 go/bin/gofmt
+#ENV GOFMT_VERSION 1.3.3
+#RUN curl -sSL https://storage.googleapis.com/golang/go${GOFMT_VERSION}.$(go env GOOS)-$(go env GOARCH).tar.gz | tar -C /go/bin -xz --strip-components=2 go/bin/gofmt
 
 # Grab Go's cover tool for dead-simple code coverage testing
 RUN go get golang.org/x/tools/cmd/cover
 
 # TODO replace FPM with some very minimal debhelper stuff
-RUN gem install --no-rdoc --no-ri fpm --version 1.3.2
+RUN	apt-get install -y libffi-dev
+RUN	gem install --no-rdoc --no-ri fpm 
+
+# Install man page generator
+
+RUN     git clone -b docker-test-image-`uname -m` https://github.com/brahmaroutu/power_docker_image.git /docker-test-image
+RUN     mkdir -p /var/lib/docker && tar -C /var/lib/docker -xf /docker-test-image/unit-tests.tar
 
 # Get the "busybox" image source so we can build locally instead of pulling
-RUN git clone -b buildroot-2014.02 https://github.com/jpetazzo/docker-busybox.git /docker-busybox
+RUN     git clone  https://github.com/brahmaroutu/power_docker_busybox.git /docker-busybox
 
 # Get the "cirros" image source so we can import it instead of fetching it during tests
 RUN curl -sSL -o /cirros.tar.gz https://github.com/ewindisch/docker-cirros/raw/1cded459668e8b9dbf4ef976c94c05add9bbd8e9/cirros-0.3.0-x86_64-lxc.tar.gz
@@ -159,6 +168,9 @@ RUN git clone -b v0.1.0 https://github.com/BurntSushi/toml.git /go/src/github.co
 
 # Wrap all commands in the "docker-in-docker" script to allow nested containers
 ENTRYPOINT ["hack/dind"]
+
+ENV CGO_ENABLED 1
+ENV USE_GCCGO 1
 
 # Upload docker source
 COPY . /go/src/github.com/docker/docker

@@ -1,4 +1,4 @@
-// +build !gccgo
+// +build gccgo
 
 package dockerversion
 

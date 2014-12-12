@@ -14,14 +14,40 @@ if [[ "$(uname -s)" == CYGWIN* ]]; then
 	DEST=$(cygpath -mw $DEST)
 fi
 
-go build \
-	-o "$DEST/$BINARY_FULLNAME" \
-	"${BUILDFLAGS[@]}" \
-	-ldflags "
-		$LDFLAGS
-		$LDFLAGS_STATIC_DOCKER
-	" \
-	./docker
+if [ -z "$USE_GCCGO" ]; then
+	go build \
+		-o "$DEST/$BINARY_FULLNAME" \
+		"${BUILDFLAGS[@]}" \
+		-ldflags "
+			$LDFLAGS
+			$LDFLAGS_STATIC_DOCKER
+		" \
+		./docker
+else
+	sed "s/!gccgo/gccgo/" dockerversion/dockerversion.go > dockerversion/dockerversion_gccgo.go
+	sed -i "s/GITCOMMIT string/& = \"$GITCOMMIT\"/;
+		s/VERSION   string/& = \"$VERSION\"/;
+		" dockerversion/dockerversion_gccgo.go
+	if echo "$LDFLAGS_STATIC_DOCKER" | grep -q 'IAMSTATIC true'; then
+		sed -i "s/IAMSTATIC bool/& = true/" dockerversion/dockerversion_gccgo.go
+		EXTLDFLAGS_STATIC_DOCKER="-Wl,--no-export-dynamic $EXTLDFLAGS_STATIC_DOCKER"
+        else
+		sed -i "s/INITPATH  string/& = \"$DOCKER_INITPATH\"/;
+			s/INITSHA1  string/& = \"$DOCKER_INITSHA1\"/;
+			" dockerversion/dockerversion_gccgo.go
+		EXTLDFLAGS_STATIC_DOCKER="-static-libgo $(echo $EXTLDFLAGS_STATIC_DOCKER | sed "s/$EXTLDFLAGS_STATIC//")"
+        fi
+	go build --compiler=gccgo \
+		-o "$DEST/$BINARY_FULLNAME" \
+		"${BUILDFLAGS[@]}" \
+		--gccgoflags "
+			-g
+			$EXTLDFLAGS_STATIC_DOCKER
+			-ldl
+		" \
+		./docker
+fi
+
 echo "Created binary: $DEST/$BINARY_FULLNAME"
 ln -sf "$BINARY_FULLNAME" "$DEST/docker$BINARY_EXTENSION"
 

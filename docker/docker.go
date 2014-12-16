@@ -17,6 +17,13 @@ import (
 	"github.com/docker/docker/utils"
 )
 
+/*
+__attribute__((constructor)) init() {
+        nsenter();
+}
+*/
+import "C"
+
 const (
 	defaultTrustKeyFile = "key.json"
 	defaultCaFile       = "ca.pem"

@@ -1,3 +1,5 @@
+// +build !gccgo
+
 package dockerversion
 
 // FIXME: this should be embedded in the docker/docker.go,

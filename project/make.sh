@@ -77,6 +77,17 @@ else
 	exit 1
 fi
 
+case `uname -m` in
+        ppc64*|s390x)
+                USE_GCCGO=1;;
+esac
+
+if [ -n "$USE_GCCGO" ]; then
+        if type gccgo-go 2> /dev/null; then
+                alias go=gccgo-go
+        fi
+fi
+
 if [ "$AUTO_GOPATH" ]; then
 	rm -rf .gopath
 	mkdir -p .gopath/src/"$(dirname "${DOCKER_PKG}")"
@@ -120,7 +131,7 @@ ORIG_BUILDFLAGS=( -a -tags "netgo static_build $DOCKER_BUILDTAGS" -installsuffix
 # see https://github.com/golang/go/issues/9369#issuecomment-69864440 for why -installsuffix is necessary here
 BUILDFLAGS=( $BUILDFLAGS "${ORIG_BUILDFLAGS[@]}" )
 # Test timeout.
-: ${TIMEOUT:=30m}
+: ${TIMEOUT:=60m}
 TESTFLAGS+=" -test.timeout=${TIMEOUT}"
 
 # A few more flags that are specific just to building a completely-static binary (see hack/make/binary)

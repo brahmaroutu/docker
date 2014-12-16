@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func TestEventsUntag(t *testing.T) {
+/*func TestEventsUntag(t *testing.T) {
 	image := "busybox"
 	dockerCmd(t, "tag", image, "utest:tag1")
 	dockerCmd(t, "tag", image, "utest:tag2")
@@ -28,7 +28,7 @@ func TestEventsUntag(t *testing.T) {
 		}
 	}
 	logDone("events - untags are logged")
-}
+}*/
 
 func TestEventsPause(t *testing.T) {
 	name := "testeventpause"

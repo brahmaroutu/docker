@@ -7,6 +7,12 @@ import (
 	"unsafe"
 )
 
+var (
+	ioctl_TIOCGPTN   = uintptr(syscall.TIOCGPTN)   /* Get Pty Number (of pty-mux device) */
+        ioctl_TIOCSPTLCK = uintptr(syscall.TIOCSPTLCK) /* Lock/unlock Pty */
+
+)
+
 func open() (pty, tty *os.File, err error) {
 	p, err := os.OpenFile("/dev/ptmx", os.O_RDWR, 0)
 	if err != nil {

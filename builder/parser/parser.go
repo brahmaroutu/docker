@@ -48,6 +48,10 @@ func init() {
 		"onbuild":    parseSubCommand,
 		"workdir":    parseString,
 		"env":        parseEnv,
+		"if":         parseString,
+		"elsif":      parseString,
+		"else":       parseString,
+		"endif":      parseString,
 		"maintainer": parseString,
 		"from":       parseString,
 		"add":        parseMaybeJSONToList,
@@ -72,6 +76,10 @@ func parseLine(line string) (string, *Node, error) {
 		return line, nil, nil
 	}
 
+	if strings.HasPrefix(line, "endif") || strings.HasPrefix(line, "ENDIF") ||
+		strings.HasPrefix(line, "else") || strings.HasPrefix(line, "ELSE") {
+		line = line + " dummy"
+	}
 	cmd, args, err := splitCommand(line)
 	if err != nil {
 		return "", nil, err

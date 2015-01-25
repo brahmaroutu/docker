@@ -4834,6 +4834,10 @@ func TestBuildMissingArgs(t *testing.T) {
 		"RUN":        {},
 		"ENTRYPOINT": {},
 		"INSERT":     {},
+		"IF":         {},
+		"ELSIF":      {},
+		"ENDIF":      {},
+		"ELSE":       {},
 	}
 
 	defer deleteAllContainers()
@@ -4855,30 +4859,616 @@ func TestBuildMissingArgs(t *testing.T) {
 		}
 
 		ctx, err := fakeContext(dockerfile, map[string]string{})
+                var out string
+                if out, err = buildImageFromContext("args", ctx, true); err == nil {
+                        t.Fatalf("%s was supposed to fail. Out:%s", cmd, out)
+                }
+                if !strings.Contains(err.Error(), cmd+" requires") {
+                        t.Fatalf("%s returned the wrong type of error:%s", cmd, err)
+                }
+        }
+
+        logDone("build - verify missing args")
+}
+
+func TestBuildEmptyScratch(t *testing.T) {
+        defer deleteImages("sc")
+        _, out, err := buildImageWithOut("sc", "FROM scratch", true)
+        if err == nil {
+                t.Fatalf("Build was supposed to fail")
+        }
+        if !strings.Contains(out, "No image was generated") {
+                t.Fatalf("Wrong error message: %v", out)
+        }
+        logDone("build - empty scratch Dockerfile")
+}
+
+func TestBuildWithIf(t *testing.T) {
+	defer deleteAllContainers()
+	{
+		name := "testbuildwithif"
+		ctx, err := fakeContext(`
+    	FROM busybox
+    	IF $IF_ENV == true
+    	ENV TEST foo
+    	ENDIF
+    	CMD echo ${TEST}
+    	`, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer ctx.Close()
-		var out string
-		if out, err = buildImageFromContext("args", ctx, true); err == nil {
-			t.Fatalf("%s was supposed to fail. Out:%s", cmd, out)
+
+		buildCmd := exec.Command(dockerBinary, "build", "-t", name, "-e", "IF_ENV=true", ".")
+		buildCmd.Dir = ctx.Dir
+		if out, _, err := runCommandWithOutput(buildCmd); err != nil {
+			t.Fatalf("failed to build the image: %s, %v", out, err)
 		}
-		if !strings.Contains(err.Error(), cmd+" requires") {
-			t.Fatalf("%s returned the wrong type of error:%s", cmd, err)
+
+		out, _, err := runCommandWithOutput(exec.Command(dockerBinary, "run", "-t", name))
+		if err != nil {
+			t.Fatal(err)
 		}
+
+		if strings.TrimSpace(out) != "foo" {
+			t.Fatalf("If block is not executed. output: %q", strings.TrimSpace(out))
+		}
+
+		logDone("build - build with if")
+
+		deleteImages(name)
 	}
 
-	logDone("build - verify missing args")
+	{
+		name := "testbuildwithif"
+		ctx, err := fakeContext(`
+        FROM busybox
+        IF $IF_ENV == true
+        ENV TEST foo
+        ENDIF
+        CMD echo ${TEST}
+        `, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer ctx.Close()
+
+		buildCmd := exec.Command(dockerBinary, "build", "-t", name, "-e", "IF_ENV=false", ".")
+		buildCmd.Dir = ctx.Dir
+		if out, _, err := runCommandWithOutput(buildCmd); err != nil {
+			t.Fatalf("failed to build the image: %s, %v", out, err)
+		}
+
+		out, _, err := runCommandWithOutput(exec.Command(dockerBinary, "run", "-t", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if strings.TrimSpace(out) != "" {
+			t.Fatalf("If block should not be executed. output: %q", strings.TrimSpace(out))
+		}
+
+		logDone("build - build with if , if not picked")
+
+		deleteImages(name)
+	}
+
+	{
+		name := "testbuildwithifelse"
+		ctx, err := fakeContext(`
+        FROM busybox
+        IF $IF_ENV == true
+        ENV TEST foo
+        ELSE
+        ENV TEST bar
+        ENDIF
+        CMD echo ${TEST}
+        `, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer ctx.Close()
+
+		buildCmd := exec.Command(dockerBinary, "build", "-t", name, "-e", "IF_ENV=true", ".")
+		buildCmd.Dir = ctx.Dir
+		if out, _, err := runCommandWithOutput(buildCmd); err != nil {
+			t.Fatalf("failed to build the image: %s, %v", out, err)
+		}
+
+		out, _, err := runCommandWithOutput(exec.Command(dockerBinary, "run", "-t", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if strings.TrimSpace(out) != "foo" {
+			t.Fatalf("If block is not execute. output: %q", strings.TrimSpace(out))
+		}
+
+		logDone("build - build with if - else, pick if")
+
+		deleteImages(name)
+	}
+
+	{
+		name := "testbuildwithifelse"
+		ctx, err := fakeContext(`
+        FROM busybox
+        IF $IF_ENV == true
+        ENV TEST foo
+        ELSE
+        ENV TEST bar
+        ENDIF
+        CMD echo ${TEST}
+        `, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer ctx.Close()
+
+		buildCmd := exec.Command(dockerBinary, "build", "-t", name, "-e", "IF_ENV=false", ".")
+		buildCmd.Dir = ctx.Dir
+		if out, _, err := runCommandWithOutput(buildCmd); err != nil {
+			t.Fatalf("failed to build the image: %s, %v", out, err)
+		}
+
+		out, _, err := runCommandWithOutput(exec.Command(dockerBinary, "run", "-t", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if strings.TrimSpace(out) != "bar" {
+			t.Fatalf("If block is not execute. output: %q", strings.TrimSpace(out))
+		}
+
+		logDone("build - build with if - else, pick else")
+
+		deleteImages(name)
+	}
+
+	{
+		name := "testbuildwithifelsifelse"
+		ctx, err := fakeContext(`
+        FROM busybox 
+        IF $IF_ENV == true
+        ENV TEST foo
+	ELSIF $IF_ENV2 == true
+        ELSE
+        ENV TEST bar
+        ENDIF
+        CMD echo ${TEST}
+        `, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer ctx.Close()
+
+		buildCmd := exec.Command(dockerBinary, "build", "-t", name, "-e", "IF_ENV=false", ".")
+		buildCmd.Dir = ctx.Dir
+		if out, _, err := runCommandWithOutput(buildCmd); err != nil {
+			t.Fatalf("failed to build the image: %s, %v", out, err)
+		}
+
+		out, _, err := runCommandWithOutput(exec.Command(dockerBinary, "run", "-t", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if strings.TrimSpace(out) != "bar" {
+			t.Fatalf("If block is not execute. output: %q", strings.TrimSpace(out))
+		}
+
+		logDone("build - build with if - elsif - else, pick else")
+
+		deleteImages(name)
+	}
+	{
+		name := "testbuildwithifelsifelse"
+		ctx, err := fakeContext(`
+        FROM busybox
+        IF $IF_ENV == true
+        ENV TEST foo
+        ELSIF $IF_ENV2 == true
+        ENV TEST bar
+        ELSE
+        ENV TEST else
+        ENDIF
+        CMD echo ${TEST}
+        `, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer ctx.Close()
+
+		buildCmd := exec.Command(dockerBinary, "build", "-t", name, "-e", "IF_ENV=true,IF_ENV2=true", ".")
+		buildCmd.Dir = ctx.Dir
+		if out, _, err := runCommandWithOutput(buildCmd); err != nil {
+			t.Fatalf("failed to build the image: %s, %v", out, err)
+		}
+
+		out, _, err := runCommandWithOutput(exec.Command(dockerBinary, "run", "-t", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if strings.TrimSpace(out) != "foo" {
+			t.Fatalf("If block is not execute. output: %q", strings.TrimSpace(out))
+		}
+
+		logDone("build - build with if - elsif - else, pick if")
+
+		deleteImages(name)
+	}
+	{
+		name := "testbuildwithifelsifelse"
+		ctx, err := fakeContext(`
+        FROM busybox
+        IF $IF_ENV == true
+        ENV TEST foo
+        ELSIF $IF_ENV2 == true
+        ENV TEST bar
+        ELSE
+        ENV TEST else
+        ENDIF
+        CMD echo ${TEST}
+        `, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer ctx.Close()
+
+		buildCmd := exec.Command(dockerBinary, "build", "-t", name, "-e", "IF_ENV=false,IF_ENV2=true", ".")
+		buildCmd.Dir = ctx.Dir
+		if out, _, err := runCommandWithOutput(buildCmd); err != nil {
+			t.Fatalf("failed to build the image: %s, %v", out, err)
+		}
+
+		out, _, err := runCommandWithOutput(exec.Command(dockerBinary, "run", "-t", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if strings.TrimSpace(out) != "bar" {
+			t.Fatalf("If block is not execute. output: %q", strings.TrimSpace(out))
+		}
+
+		logDone("build - build with if - elsif - else, pick elsif")
+
+		deleteImages(name)
+	}
+
+	{
+		name := "testbuildwithifelsifelse"
+		ctx, err := fakeContext(`
+        FROM busybox 
+        IF $IF_ENV == true
+        ENV TEST foo
+        ELSIF $IF_ENV2 == true
+        ENV TEST elsif1
+        ELSIF $IF_ENV3 == true
+        ENV TEST elsif2
+        ELSE
+        ENV TEST else
+        ENDIF
+        CMD echo ${TEST}
+        `, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer ctx.Close()
+
+		buildCmd := exec.Command(dockerBinary, "build", "-t", name, "-e", "IF_ENV=false,IF_ENV2=false,IF_ENV3=true", ".")
+		buildCmd.Dir = ctx.Dir
+		if out, _, err := runCommandWithOutput(buildCmd); err != nil {
+			t.Fatalf("failed to build the image: %s, %v", out, err)
+		}
+
+		out, _, err := runCommandWithOutput(exec.Command(dockerBinary, "run", "-t", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if strings.TrimSpace(out) != "elsif2" {
+			t.Fatalf("If block is not execute. output: %q", strings.TrimSpace(out))
+		}
+
+		logDone("build - build with if - elsif - else, pick second elsif")
+
+		deleteImages(name)
+	}
+
 }
 
-func TestBuildEmptyScratch(t *testing.T) {
-	defer deleteImages("sc")
-	_, out, err := buildImageWithOut("sc", "FROM scratch", true)
-	if err == nil {
-		t.Fatalf("Build was supposed to fail")
+func TestBuildWithNestedIf(t *testing.T) {
+	defer deleteAllContainers()
+	{
+		name := "testbuildwithnestedif"
+		ctx, err := fakeContext(`
+        FROM busybox
+        IF $IF_ENV == true
+        ENV TEST foo
+		IF $IF_NESTED_ENV == true
+		ENV NESTED nested
+		ENDIF
+        ENDIF
+        CMD echo ${TEST} ${NESTED}
+        `, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer ctx.Close()
+
+		buildCmd := exec.Command(dockerBinary, "build", "-t", name, "-e", "IF_ENV=true,IF_NESTED_ENV=true", ".")
+		buildCmd.Dir = ctx.Dir
+		if out, _, err := runCommandWithOutput(buildCmd); err != nil {
+			t.Fatalf("failed to build the image: %s, %v", out, err)
+		}
+
+		out, _, err := runCommandWithOutput(exec.Command(dockerBinary, "run", "-t", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if strings.TrimSpace(out) != "foo nested" {
+			t.Fatalf("If block is not executed. output: %q", strings.TrimSpace(out))
+		}
+
+		logDone("build - build with nested if")
+
+		deleteImages(name)
 	}
-	if !strings.Contains(out, "No image was generated") {
-		t.Fatalf("Wrong error message: %v", out)
+
+	{
+		name := "testbuildwithnestedif"
+		ctx, err := fakeContext(`
+        FROM busybox
+        IF $IF_ENV == true
+        ENV TEST foo
+                IF $IF_NESTED_ENV == true
+                ENV NESTED nested
+                ENDIF
+        ENDIF
+        CMD echo ${TEST} ${NESTED}
+        `, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer ctx.Close()
+
+		buildCmd := exec.Command(dockerBinary, "build", "-t", name, "-e", "IF_ENV=true,IF_NESTED_ENV=false", ".")
+		buildCmd.Dir = ctx.Dir
+		if out, _, err := runCommandWithOutput(buildCmd); err != nil {
+			t.Fatalf("failed to build the image: %s, %v", out, err)
+		}
+
+		out, _, err := runCommandWithOutput(exec.Command(dockerBinary, "run", "-t", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if strings.TrimSpace(out) != "foo" {
+			t.Fatalf("If block is not executed. output: %q", strings.TrimSpace(out))
+		}
+
+		logDone("build - build with nested if with nested not picked")
+
+		deleteImages(name)
 	}
-	logDone("build - empty scratch Dockerfile")
+
+	{
+		name := "testbuildwithnestedif"
+		ctx, err := fakeContext(`
+        FROM busybox
+        IF $IF_ENV == true
+        ENV TEST foo
+	ELSE
+        ENV TEST bar
+                IF $IF_NESTED_ENV == true
+                ENV NESTED nested
+                ENDIF
+        ENDIF
+        CMD echo ${TEST} ${NESTED}
+        `, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer ctx.Close()
+
+		buildCmd := exec.Command(dockerBinary, "build", "-t", name, "-e", "IF_ENV=false,IF_NESTED_ENV=true", ".")
+		buildCmd.Dir = ctx.Dir
+		if out, _, err := runCommandWithOutput(buildCmd); err != nil {
+			t.Fatalf("failed to build the image: %s, %v", out, err)
+		}
+
+		out, _, err := runCommandWithOutput(exec.Command(dockerBinary, "run", "-t", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if strings.TrimSpace(out) != "bar nested" {
+			t.Fatalf("If block is not executed. output: %q", strings.TrimSpace(out))
+		}
+
+		logDone("build - build with nested if in else")
+
+		deleteImages(name)
+	}
+
+	{
+		name := "testbuildwithnestedif"
+		ctx, err := fakeContext(`
+        FROM busybox 
+        IF $IF_ENV == true
+        ENV TEST foo
+        ELSIF $IF_ENV2 == true
+        ENV TEST bar
+                IF $IF_NESTED_ENV == true
+                ENV NESTED nested
+		ELSE $IF_NESTED_ENV2 == true
+ 		ENV NESTED nestedelse
+                ENDIF
+        ENDIF   
+        CMD echo ${TEST} ${NESTED}
+        `, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer ctx.Close()
+
+		buildCmd := exec.Command(dockerBinary, "build", "-t", name, "-e", "IF_ENV=false,IF_ENV2=true,IF_NESTED_ENV=false,IF_NESTED_ENV2=true", ".")
+		buildCmd.Dir = ctx.Dir
+		if out, _, err := runCommandWithOutput(buildCmd); err != nil {
+			t.Fatalf("failed to build the image: %s, %v", out, err)
+		}
+
+		out, _, err := runCommandWithOutput(exec.Command(dockerBinary, "run", "-t", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if strings.TrimSpace(out) != "bar nestedelse" {
+			t.Fatalf("If block is not executed. output: %q", strings.TrimSpace(out))
+		}
+
+		logDone("build - build with nested if in else")
+
+		deleteImages(name)
+	}
+}
+
+func TestBuildWithThreeLevelNestedIf(t *testing.T) {
+	defer deleteAllContainers()
+	{
+		name := "testbuildwithnestedif"
+		ctx, err := fakeContext(`
+        FROM busybox
+        IF $IF_ENV == true
+        ENV TEST foo
+                IF $IF_NESTED_ENV == true
+                	ENV NESTED nested
+			IF $IF_NESTED2_ENV == true
+                		ENV NESTED nested2
+			ENDIF
+                ENDIF
+        ENDIF
+        CMD echo ${TEST} ${NESTED} ${NESTED2}
+        `, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer ctx.Close()
+
+		buildCmd := exec.Command(dockerBinary, "build", "-t", name, "-e", "IF_ENV=true,IF_NESTED_ENV=true", ".")
+		buildCmd.Dir = ctx.Dir
+		if out, _, err := runCommandWithOutput(buildCmd); err != nil {
+			t.Fatalf("failed to build the image: %s, %v", out, err)
+		}
+
+		out, _, err := runCommandWithOutput(exec.Command(dockerBinary, "run", "-t", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if strings.TrimSpace(out) != "foo nested" {
+			t.Fatalf("If block is not executed. output: %q", strings.TrimSpace(out))
+		}
+
+		logDone("build - build with nested if")
+
+		deleteImages(name)
+	}
+
+	{
+		name := "testbuildwithnestedif"
+		ctx, err := fakeContext(`
+        FROM busybox 
+        IF $IF_ENV == true
+        ENV TEST foo
+                IF $IF_NESTED_ENV == true
+                        ENV NESTED nested
+                        IF $IF_NESTED2_ENV == true
+                                ENV NESTED2 nested2
+                        ENDIF   
+                ENDIF   
+        ENDIF   
+        CMD echo ${TEST} ${NESTED} ${NESTED2}
+        `, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer ctx.Close()
+
+		buildCmd := exec.Command(dockerBinary, "build", "-t", name, "-e", "IF_ENV=true,IF_NESTED_ENV=true,IF_NESTED2_ENV=true", ".")
+		buildCmd.Dir = ctx.Dir
+		if out, _, err := runCommandWithOutput(buildCmd); err != nil {
+			t.Fatalf("failed to build the image: %s, %v", out, err)
+		}
+
+		out, _, err := runCommandWithOutput(exec.Command(dockerBinary, "run", "-t", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if strings.TrimSpace(out) != "foo nested nested2" {
+			t.Fatalf("If block is not executed. output: %q", strings.TrimSpace(out))
+		}
+
+		logDone("build - build with nested if")
+
+		deleteImages(name)
+	}
+
+}
+
+func TestBuildWithIfNegative(t *testing.T) {
+	defer deleteAllContainers()
+	{
+		name := "testbuildwithif"
+		ctx, err := fakeContext(`
+        FROM busybox
+        IF $IF_ENV true ENV TEST foo
+        ENDIF
+        CMD echo ${TEST}
+        `, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer ctx.Close()
+
+		buildCmd := exec.Command(dockerBinary, "build", "-t", name, "-e", "IF_ENV=true", ".")
+		buildCmd.Dir = ctx.Dir
+		if out, _, err := runCommandWithOutput(buildCmd); err == nil {
+			t.Fatalf("Building the image should fail: %q", out)
+		} else if strings.Contains(err.Error(), "Aborting build, Invalid condition") {
+			t.Fatalf("Expecting error (Aborting build, Invalid condition...) but received error: %q", err)
+		}
+
+		logDone("build - build with if wrong condition")
+
+		deleteImages(name)
+	}
+
+	{
+		name := "testbuildwithifmissingendif"
+		ctx, err := fakeContext(`
+        FROM busybox
+        IF $IF_ENV true ENV TEST foo
+        CMD echo ${TEST}
+        `, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer ctx.Close()
+
+		buildCmd := exec.Command(dockerBinary, "build", "-t", name, "-e", "IF_ENV=true", ".")
+		buildCmd.Dir = ctx.Dir
+		if out, _, err := runCommandWithOutput(buildCmd); err == nil {
+			t.Fatalf("Building the image should fail: %q", out)
+		} else if strings.Contains(err.Error(), "End Of Stream reached, no end of block statement found") {
+			t.Fatalf("Expecting error (End Of Stream reached, no end of block statement found) but received error: %q", err)
+		}
+
+		logDone("build - build with if missing endif")
+
+		deleteImages(name)
+	}
 }

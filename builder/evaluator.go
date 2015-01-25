@@ -116,6 +116,7 @@ type Builder struct {
 	context        tarsum.TarSum // the context is a tarball that is uploaded by the client
 	contextPath    string        // the path of the temporary directory the local context is unpacked to (server side)
 	noBaseImage    bool          // indicates that this build does not start from any base image, but is being built from an empty file system.
+
 }
 
 // Run the builder with the context. This is the lynchpin of this package. This
@@ -145,12 +146,17 @@ func (b *Builder) Run(context io.Reader) (string, error) {
 		return "", err
 	}
 
+	newData, err := parser.PreProcess(&b.dockerfile.Children)
+	if err != nil {
+		return "", err
+	}
+
 	// some initializations that would not have been supplied by the caller.
 	b.Config = &runconfig.Config{}
 	b.TmpContainers = map[string]struct{}{}
 
-	for i, n := range b.dockerfile.Children {
-		if err := b.dispatch(i, n); err != nil {
+	for i, n := range newData {
+		if err := b.dispatch(i, &n); err != nil {
 			if b.ForceRemove {
 				b.clearTmp()
 			}
@@ -269,6 +275,7 @@ func (b *Builder) dispatch(stepN int, ast *parser.Node) error {
 		ast = ast.Next
 		var str string
 		str = ast.Value
+
 		if _, ok := replaceEnvAllowed[cmd]; ok {
 			str = b.replaceEnv(ast.Value)
 		}

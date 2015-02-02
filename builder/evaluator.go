@@ -25,6 +25,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
@@ -73,6 +74,9 @@ func init() {
 		command.Volume:     volume,
 		command.User:       user,
 		command.Insert:     insert,
+		command.If:         block,
+		command.Elsif:      block,
+		command.Else:       block,
 	}
 }
 
@@ -115,6 +119,8 @@ type Builder struct {
 	context        tarsum.TarSum // the context is a tarball that is uploaded by the client
 	contextPath    string        // the path of the temporary directory the local context is unpacked to (server side)
 	noBaseImage    bool          // indicates that this build does not start from any base image, but is being built from an empty file system.
+
+	validBlock bool
 }
 
 // Run the builder with the context. This is the lynchpin of this package. This
@@ -144,21 +150,18 @@ func (b *Builder) Run(context io.Reader) (string, error) {
 		return "", err
 	}
 
+	block, err := parser.ReadBlock(&b.dockerfile.Children, false)
+	if err != nil {
+		return "", err
+	}
+
 	// some initializations that would not have been supplied by the caller.
 	b.Config = &runconfig.Config{}
 	b.TmpContainers = map[string]struct{}{}
 
-	for i, n := range b.dockerfile.Children {
-		if err := b.dispatch(i, n); err != nil {
-			if b.ForceRemove {
-				b.clearTmp()
-			}
-			return "", err
-		}
-		fmt.Fprintf(b.OutStream, " ---> %s\n", utils.TruncateID(b.image))
-		if b.Remove {
-			b.clearTmp()
-		}
+	b.validBlock = false
+	if _, err := b.processBlock(block, 0); err != nil {
+		return "", err
 	}
 
 	if b.image == "" {
@@ -167,6 +170,88 @@ func (b *Builder) Run(context io.Reader) (string, error) {
 
 	fmt.Fprintf(b.OutStream, "Successfully built %s\n", utils.TruncateID(b.image))
 	return b.image, nil
+}
+
+func (b *Builder) evaluateCondition(cond string) (bool, error) {
+	args := strings.Split(cond, "==")
+	if len(args) != 2 {
+		if b, err := strconv.ParseBool(cond); err != nil {
+			return false, errors.New(fmt.Sprintf("Aborting build, Invalid condition: (%q) error: %q", cond, err))
+		} else {
+			return b, nil
+		}
+	}
+
+	if strings.HasPrefix(args[0], "$") {
+		args[0] = os.Getenv(strings.Trim(args[0], "$ "))
+	}
+
+	if strings.HasPrefix(args[1], "$") {
+		args[1] = os.Getenv(strings.Trim(args[1], "$ "))
+	}
+	return (strings.Trim(args[0], " ") == strings.Trim(args[1], " ")), nil
+}
+
+func (b *Builder) processBlock(block *parser.Block, stepnum int) (int, error) {
+	var err error
+	if block == nil {
+		return stepnum, nil
+	}
+
+	if block.Statements != nil {
+		for _, n := range block.Statements {
+			stepnum++
+			if err = b.dispatch(stepnum, n); err != nil {
+				if b.ForceRemove {
+					b.clearTmp()
+				}
+				return stepnum, err
+			}
+			fmt.Fprintf(b.OutStream, " ---> %s\n", utils.TruncateID(b.image))
+			if b.Remove {
+				b.clearTmp()
+			}
+		}
+	}
+	if block.Ifstatement != nil {
+		if stepnum, err = b.processIfBlock(block, stepnum); err != nil {
+			return stepnum, err
+		}
+	}
+
+	if block.Next != nil {
+		return b.processBlock(block.Next, stepnum)
+	}
+	return stepnum, nil
+}
+
+func (b *Builder) processIfBlock(block *parser.Block, stepnum int) (int, error) {
+	var err error
+	if err = b.dispatch(stepnum, block.Condition); err != nil {
+		return stepnum, err
+	} else if b.validBlock {
+		b.validBlock = false
+		if stepnum, err = b.processBlock(block.Ifstatement.Ifblock, stepnum); err != nil {
+			return stepnum, err
+		}
+		return stepnum, nil
+	}
+
+	for _, elsifblk := range block.Ifstatement.Elsifblocks {
+		if err := b.dispatch(stepnum, elsifblk.Condition); err != nil {
+			return stepnum, err
+		} else if b.validBlock {
+			b.validBlock = false
+			if stepnum, err = b.processBlock(elsifblk, stepnum); err != nil {
+				return stepnum, err
+			}
+			return stepnum, nil
+		}
+	}
+	if stepnum, err = b.processBlock(block.Ifstatement.Elseblock, stepnum); err != nil {
+		return stepnum, err
+	}
+	return stepnum, nil
 }
 
 // Reads a Dockerfile from the current context. It assumes that the

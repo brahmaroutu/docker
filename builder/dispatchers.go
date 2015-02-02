@@ -396,6 +396,12 @@ func volume(b *Builder, args []string, attributes map[string]bool, original stri
 	return nil
 }
 
+func block(b *Builder, args []string, attributes map[string]bool, original string) error {
+	var err error
+	b.validBlock, err = b.evaluateCondition(args[0])
+	return err
+}
+
 // INSERT is no longer accepted, but we still parse it.
 func insert(b *Builder, args []string, attributes map[string]bool, original string) error {
 	return fmt.Errorf("INSERT has been deprecated. Please use ADD instead")

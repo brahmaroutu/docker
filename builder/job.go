@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/docker/docker/api"
 	"github.com/docker/docker/daemon"
@@ -39,6 +40,7 @@ func (b *BuilderJob) CmdBuild(job *engine.Job) engine.Status {
 		rm             = job.GetenvBool("rm")
 		forceRm        = job.GetenvBool("forcerm")
 		pull           = job.GetenvBool("pull")
+		env            = job.Getenv("envs")
 		authConfig     = &registry.AuthConfig{}
 		configFile     = &registry.ConfigFile{}
 		tag            string
@@ -101,6 +103,17 @@ func (b *BuilderJob) CmdBuild(job *engine.Job) engine.Status {
 		}
 		context = c
 	}
+
+	if env != "" {
+		envs := strings.Split(env, ",")
+
+		for _, kv := range envs {
+			parts := strings.SplitN(kv, "=", 2)
+			os.Setenv(parts[0], parts[1])
+		}
+
+	}
+
 	defer context.Close()
 
 	sf := utils.NewStreamFormatter(job.GetenvBool("json"))

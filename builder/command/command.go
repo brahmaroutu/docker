@@ -16,6 +16,10 @@ const (
 	Volume     = "volume"
 	User       = "user"
 	Insert     = "insert"
+	If         = "if"
+	Elsif      = "elsif"
+	Else       = "else"
+	Endif      = "endif"
 )
 
 // Commands is list of all Dockerfile commands
@@ -34,4 +38,8 @@ var Commands = []string{
 	Volume,
 	User,
 	Insert,
+	If,
+	Elsif,
+	Else,
+	Endif,
 }

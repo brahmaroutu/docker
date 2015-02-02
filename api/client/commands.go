@@ -86,7 +86,8 @@ func (cli *DockerCli) CmdBuild(args ...string) error {
 	rm := cmd.Bool([]string{"#rm", "-rm"}, true, "Remove intermediate containers after a successful build")
 	forceRm := cmd.Bool([]string{"-force-rm"}, false, "Always remove intermediate containers")
 	pull := cmd.Bool([]string{"-pull"}, false, "Always attempt to pull a newer version of the image")
-	dockerfileName := cmd.String([]string{"f", "-file"}, "", "Name of the Dockerfile(Default is 'Dockerfile')")
+	env := cmd.String([]string{"e", "-envs"}, "", "Environment for the build")
+	dockerfileName := cmd.String([]string{"f", "-file"}, "", "Name of the Dockerfile(Default is 'Dockerfile' at context root)")
 
 	cmd.Require(flag.Exact, 1)
 
@@ -257,6 +258,8 @@ func (cli *DockerCli) CmdBuild(args ...string) error {
 	if *pull {
 		v.Set("pull", "1")
 	}
+
+	v.Set("envs", *env)
 
 	v.Set("dockerfile", *dockerfileName)
 

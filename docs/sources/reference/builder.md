@@ -884,6 +884,49 @@ For example you might add something like this:
 
 > **Warning**: The `ONBUILD` instruction may not trigger `FROM` or `MAINTAINER` instructions.
 
+## IF-ELSIF-ELSE-ENDIF
+
+The IF-ELSIF-ELSE-ENDIF supports branching code inside docker files. Each Statement 
+IF, ELSIF, ELSE and ENDIF are parsed as commands and hence they should be on separate
+lines in the Dockerfile as shown in the example below. Each of the IF, ELSIF and ELSE 
+statements are followed by a set of allowed build commands that are accepted by the 
+builder. These blocks can then be nested with other IF blocks. If the condition associated 
+with the IF or ELSIF statement is evaluated to true then the block of statements below the
+IF or ELSIF statement are executed by the builder, if conditionals do not evaluate to true
+then the  block of statmeent under ELSE will be execute if ELSE statment is specified. 
+Once a block is executed all other blocks in the IF-ELSIF-ELSE-ENDIF block are ignored.
+The conditional expressions that IF, ELSIF, and ELSE statements evaluate are currently kept 
+simple. A conditional expression can compare two environment variables, an environment variable
+with a constant or a unary expression with environment variable. For example $ENV == $ENV2, 
+$ENV == "true" or $ENV. A unary expression is evaluated as true or false.
+
+**Warning**: When using conditional IF statements, the image built may not be same between two
+builds as the build path may take different routes depending on the environment passed to the
+builder. When building with conditionals you are violating the basic principle of docker builds
+that states images built from a Dockerfile are always going to be the same.
+
+**Warning**: Environment variables that are passed to the builder will be effective in evaluations
+and these environment variables are passed using the commandline -e option. The ENV statements 
+inside the Dockerfile cannot be used to evaluate the conditionals as those environment variables
+will not be seen by the builder.
+
+**Warning**: Conditionals are kept simple in the first phase. In the future conditionals can be 
+compounded with "or, and and not" logic. 
+      
+    [...]
+    IF $MYENV == true 
+ 	ENV TEST if
+    ELSIF $MYENV2 == true
+     	ENV TEST elsif1
+    ELSIF $MYENV3 == true
+     	ENV TEST elsif2
+    ELSE
+    	ENV TEST else
+    ENDIF
+
+    The above code will set the environment variable `TEST` based on the condition. For example if the build is  issued with `docker build -e MYENV2=true -it .` then the environment variable `TEST` will be set to `elsif1`.
+
+
 ## Dockerfile Examples
 
     # Nginx

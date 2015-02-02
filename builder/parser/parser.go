@@ -60,6 +60,10 @@ func init() {
 		command.Expose:     parseStringsWhitespaceDelimited,
 		command.Volume:     parseMaybeJSONToList,
 		command.Insert:     parseIgnore,
+		command.If:         parseString,
+		command.Else:       parseString,
+		command.Elsif:      parseString,
+		command.Endif:      parseString,
 	}
 }
 

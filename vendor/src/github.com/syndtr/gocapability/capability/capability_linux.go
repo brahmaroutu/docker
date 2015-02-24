@@ -45,6 +45,9 @@ func init() {
 }
 
 func initLastCap() error {
+	capLastCap = CAP_BLOCK_SUSPEND
+	return nil
+/*
 	if capLastCap != 0 {
 		return nil
 	}
@@ -64,6 +67,7 @@ func initLastCap() error {
 	fmt.Sscanf(string(b), "%d", &capLastCap)
 
 	return nil
+*/
 }
 
 func mkStringCap(c Capabilities, which CapType) (ret string) {

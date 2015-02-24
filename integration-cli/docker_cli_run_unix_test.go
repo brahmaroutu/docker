@@ -297,7 +297,7 @@ func (s *DockerSuite) TestRunOOMExitCode(c *check.C) {
 	select {
 	case err := <-errChan:
 		c.Assert(err, check.IsNil)
-	case <-time.After(30 * time.Second):
+	case <-time.After(600 * time.Second):
 		c.Fatal("Timeout waiting for container to die on OOM")
 	}
 }

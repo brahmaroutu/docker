@@ -130,9 +130,11 @@ func (s *DockerSuite) TestPullScratchNotAllowed(c *check.C) {
 	}
 }
 
+
 // pulling an image with --all-tags=true
 func (s *DockerSuite) TestPullImageWithAllTagFromCentralRegistry(c *check.C) {
 	testRequires(c, Network)
+	testRequires(c, X86_64)
 
 	dockerCmd(c, "pull", "busybox")
 

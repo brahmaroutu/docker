@@ -99,7 +99,7 @@ func (s *DockerRegistrySuite) TestPushInterrupt(c *check.C) {
 	}
 
 	// Interrupt push (yes, we have no idea at what point it will get killed).
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(600 * time.Millisecond)
 	if err := pushCmd.Process.Kill(); err != nil {
 		c.Fatalf("Failed to kill push process: %v", err)
 	}

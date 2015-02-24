@@ -1,0 +1,17 @@
+docker images
+for image in `docker images | awk '{print $1}'`; do
+if ( [ -z "${image##*busybox-ppc64le}" ] || [ -z "${image##*busybox-s390x}" ] ); then
+        echo "tag $image as busybox"
+        docker tag $image busybox:latest
+	docker rmi $image
+elif ( [ -z "${image##*hello-world-ppc64le}" ] || [ -z "${image##*hello-world-s390x}" ] ); then
+        echo "tag $image as hello-world"
+        docker tag $image:frozen hello-world:frozen
+	docker rmi $image:frozen
+elif ( [ -z "${image##*unshare-ppc64le}" ] || [ -z "$image##*unshare-s390x}" ] ); then
+        echo "tag $image as unshare"
+        docker tag $image jess/unshare:latest
+	docker rmi $image
+fi
+done
+docker images

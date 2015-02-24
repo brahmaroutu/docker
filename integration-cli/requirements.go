@@ -147,6 +147,16 @@ var (
 		},
 		"Test requires native Golang compiler instead of GCCGO",
 	}
+	X86_64 = testRequirement{
+                func() bool {
+                        out, err := exec.Command("uname", "-p").Output()
+                        if err != nil && (strings.Contains(string(out),"x86_64") || strings.Contains(string(out),"i386")) {
+                                return true
+                        }
+                        return false
+                },
+                "Test requires x86 images",
+        }
 )
 
 // testRequires checks if the environment satisfies the requirements

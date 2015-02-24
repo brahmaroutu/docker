@@ -1618,6 +1618,8 @@ func (s *DockerDaemonSuite) TestDaemonCorruptedSyslogAddress(c *check.C) {
 }
 
 func (s *DockerDaemonSuite) TestDaemonWideLogConfig(c *check.C) {
+	testRequires(c,X86_64)
+
 	c.Assert(s.d.Start("--log-driver=json-file", "--log-opt=max-size=1k"), check.IsNil)
 	out, err := s.d.Cmd("run", "-d", "--name=logtest", "busybox", "top")
 	c.Assert(err, check.IsNil, check.Commentf("Output: %s, err: %v", out, err))

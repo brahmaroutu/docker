@@ -41,7 +41,7 @@ all: build
 	$(DOCKER_RUN_DOCKER) hack/make.sh
 
 binary: build
-	$(DOCKER_RUN_DOCKER) hack/make.sh binary
+	$(DOCKER_RUN_DOCKER) hack/make.sh gccgo
 
 cross: build
 	$(DOCKER_RUN_DOCKER) hack/make.sh binary cross
@@ -59,7 +59,7 @@ test-unit: build
 	$(DOCKER_RUN_DOCKER) hack/make.sh test-unit
 
 test-integration-cli: build
-	$(DOCKER_RUN_DOCKER) hack/make.sh binary test-integration-cli
+	$(DOCKER_RUN_DOCKER) hack/make.sh gccgo test-integration-cli
 
 test-docker-py: build
 	$(DOCKER_RUN_DOCKER) hack/make.sh binary test-docker-py
@@ -71,6 +71,7 @@ shell: build
 	$(DOCKER_RUN_DOCKER) bash
 
 build: bundles
+	project/generate-dockerfile.sh > Dockerfile
 	docker build -t "$(DOCKER_IMAGE)" .
 
 bundles:

@@ -14,10 +14,12 @@ go build -compiler=gccgo \
 	-o "$DEST/$BINARY_FULLNAME" \
 	"${BUILDFLAGS[@]}" \
 	-gccgoflags "
+		-O0
 		-g
 		$EXTLDFLAGS_STATIC
 		-Wl,--no-export-dynamic
 		-ldl
+		-pthread
 	" \
 	./docker
 

@@ -1,0 +1,12 @@
+for image in `docker images | awk '{print $1}'`; do
+if ( [ -z "${image##ppc64le/busybox}" ] || [ -z "${image##s390x/busybox}" ] ); then
+        docker tag $image busybox:latest
+	docker rmi $image
+elif ( [ -z "${image##ppc64le/hello-world}" ] || [ -z "${image##s390x/hello-world}" ] ); then
+        docker tag $image:frozen hello-world:frozen
+	docker rmi $image:frozen
+elif ( [ -z "${image##ppc64le/unshare}" ] || [ -z "$image##linux390/unshare}" ] ); then
+        docker tag $image jess/unshare:latest
+	docker rmi $image
+fi
+done

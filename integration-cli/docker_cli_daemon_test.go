@@ -1665,6 +1665,8 @@ func (s *DockerDaemonSuite) TestDaemonRestartWithContainerWithRestartPolicyAlway
 }
 
 func (s *DockerDaemonSuite) TestDaemonWideLogConfig(c *check.C) {
+	testRequires(c,X86_64)
+
 	if err := s.d.StartWithBusybox("--log-driver=json-file", "--log-opt=max-size=1k"); err != nil {
 		c.Fatal(err)
 	}

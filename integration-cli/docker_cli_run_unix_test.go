@@ -237,7 +237,7 @@ func (s *DockerSuite) TestRunEchoStdoutWitCPUShares(c *check.C) {
 func (s *DockerSuite) TestRunEchoStdoutWithCPUSharesAndMemoryLimit(c *check.C) {
 	testRequires(c, cpuShare)
 	testRequires(c, memoryLimitSupport)
-	out, _, _ := dockerCmdWithStdoutStderr(c, "run", "--cpu-shares", "1000", "-m", "16m", "busybox", "echo", "test")
+	out, _, _ := dockerCmdWithStdoutStderr(c, "run", "--cpu-shares", "1000", "-m", "32m", "busybox", "echo", "test")
 	if out != "test\n" {
 		c.Errorf("container should've printed 'test', got %q instead", out)
 	}
@@ -294,7 +294,7 @@ func (s *DockerSuite) TestRunOOMExitCode(c *check.C) {
 	select {
 	case err := <-errChan:
 		c.Assert(err, check.IsNil)
-	case <-time.After(30 * time.Second):
+	case <-time.After(600 * time.Second):
 		c.Fatal("Timeout waiting for container to die on OOM")
 	}
 }
@@ -302,7 +302,7 @@ func (s *DockerSuite) TestRunOOMExitCode(c *check.C) {
 // "test" should be printed
 func (s *DockerSuite) TestRunEchoStdoutWithMemoryLimit(c *check.C) {
 	testRequires(c, memoryLimitSupport)
-	out, _, _ := dockerCmdWithStdoutStderr(c, "run", "-m", "16m", "busybox", "echo", "test")
+	out, _, _ := dockerCmdWithStdoutStderr(c, "run", "-m", "32m", "busybox", "echo", "test")
 	out = strings.Trim(out, "\r\n")
 
 	if expected := "test"; out != expected {
@@ -318,7 +318,7 @@ func (s *DockerSuite) TestRunWithoutMemoryswapLimit(c *check.C) {
 	testRequires(c, NativeExecDriver)
 	testRequires(c, memoryLimitSupport)
 	testRequires(c, swapMemorySupport)
-	dockerCmd(c, "run", "-m", "16m", "--memory-swap", "-1", "busybox", "true")
+	dockerCmd(c, "run", "-m", "32m", "--memory-swap", "-1", "busybox", "true")
 }
 
 func (s *DockerSuite) TestRunWithSwappiness(c *check.C) {
@@ -443,7 +443,7 @@ func (s *DockerSuite) TestRunWithCorrectMemorySwapOnLXC(c *check.C) {
 	testRequires(c, swapMemorySupport)
 	testRequires(c, SameHostDaemon)
 
-	out, _ := dockerCmd(c, "run", "-d", "-m", "16m", "--memory-swap", "64m", "busybox", "top")
+	out, _ := dockerCmd(c, "run", "-d", "-m", "32m", "--memory-swap", "64m", "busybox", "top")
 	if _, err := os.Stat("/sys/fs/cgroup/memory/lxc"); err != nil {
 		c.Skip("Excecution driver must be LXC for this test")
 	}

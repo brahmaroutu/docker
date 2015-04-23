@@ -219,7 +219,8 @@ func (ta *tarAppender) addTarFile(path, name string) error {
 
 	// if it's a regular file and has more than 1 link,
 	// it's hardlinked, so set the type flag accordingly
-	if fi.Mode().IsRegular() && nlink > 1 {
+	// if fi.Mode().IsRegular() && nlink > 1 {
+	if nlink > 1 {
 		// a link should have a name that it links too
 		// and that linked name should be first in the tar archive
 		if oldpath, ok := ta.SeenFiles[inode]; ok {
@@ -391,15 +392,7 @@ func Tar(path string, compression Compression) (io.ReadCloser, error) {
 // TarWithOptions creates an archive from the directory at `path`, only including files whose relative
 // paths are included in `options.IncludeFiles` (if non-nil) or not in `options.ExcludePatterns`.
 func TarWithOptions(srcPath string, options *TarOptions) (io.ReadCloser, error) {
-
-	patterns, patDirs, exceptions, err := fileutils.CleanPatterns(options.ExcludePatterns)
-
-	if err != nil {
-		return nil, err
-	}
-
 	pipeReader, pipeWriter := io.Pipe()
-
 	compressWriter, err := CompressStream(pipeWriter, options.Compression)
 	if err != nil {
 		return nil, err
@@ -425,62 +418,8 @@ func TarWithOptions(srcPath string, options *TarOptions) (io.ReadCloser, error) 
 
 		seen := make(map[string]bool)
 
-		var renamedRelFilePath string // For when tar.Options.Name is set
 		for _, include := range options.IncludeFiles {
-			filepath.Walk(filepath.Join(srcPath, include), func(filePath string, f os.FileInfo, err error) error {
-				if err != nil {
-					logrus.Debugf("Tar: Can't stat file %s to tar: %s", srcPath, err)
-					return nil
-				}
-
-				relFilePath, err := filepath.Rel(srcPath, filePath)
-				if err != nil || (relFilePath == "." && f.IsDir()) {
-					// Error getting relative path OR we are looking
-					// at the root path. Skip in both situations.
-					return nil
-				}
-
-				skip := false
-
-				// If "include" is an exact match for the current file
-				// then even if there's an "excludePatterns" pattern that
-				// matches it, don't skip it. IOW, assume an explicit 'include'
-				// is asking for that file no matter what - which is true
-				// for some files, like .dockerignore and Dockerfile (sometimes)
-				if include != relFilePath {
-					skip, err = fileutils.OptimizedMatches(relFilePath, patterns, patDirs)
-					if err != nil {
-						logrus.Debugf("Error matching %s", relFilePath, err)
-						return err
-					}
-				}
-
-				if skip {
-					if !exceptions && f.IsDir() {
-						return filepath.SkipDir
-					}
-					return nil
-				}
-
-				if seen[relFilePath] {
-					return nil
-				}
-				seen[relFilePath] = true
-
-				// Rename the base resource
-				if options.Name != "" && filePath == srcPath+"/"+filepath.Base(relFilePath) {
-					renamedRelFilePath = relFilePath
-				}
-				// Set this to make sure the items underneath also get renamed
-				if options.Name != "" {
-					relFilePath = strings.Replace(relFilePath, renamedRelFilePath, options.Name, 1)
-				}
-
-				if err := ta.addTarFile(filePath, relFilePath); err != nil {
-					logrus.Debugf("Can't add file %s to tar: %s", filePath, err)
-				}
-				return nil
-			})
+			walkArchiveAppend(ta, options, seen, srcPath, include, "")
 		}
 
 		// Make sure to check the error on Close.
@@ -496,6 +435,98 @@ func TarWithOptions(srcPath string, options *TarOptions) (io.ReadCloser, error) 
 	}()
 
 	return pipeReader, nil
+}
+
+func walkArchiveAppend(ta *tarAppender, options *TarOptions, seen map[string]bool, srcPath, include, rootDir string) {
+	var renamedRelFilePath string // For when tar.Options.Name is set
+
+	patterns, patDirs, exceptions, err := fileutils.CleanPatterns(options.ExcludePatterns)
+	if err != nil {
+		logrus.Debugf("Tar: error finding patterns from  %s", options.ExcludePatterns)
+		return
+	}
+
+	filepath.Walk(filepath.Join(srcPath, include), func(filePath string, f os.FileInfo, err error) error {
+		if err != nil {
+			logrus.Debugf("Tar: Can't stat file %s to tar: %s", srcPath, err)
+			return nil
+		}
+
+		relFilePath, err := filepath.Rel(srcPath, filePath)
+		if err != nil || (relFilePath == "." && f.IsDir()) {
+			// Error getting relative path OR we are looking
+			// at the root path. Skip in both situations.
+			return nil
+		}
+
+		skip := false
+
+		// If "include" is an exact match for the current file
+		// then even if there's an "excludePatterns" pattern that
+		// matches it, don't skip it. IOW, assume an explicit 'include'
+		// is asking for that file no matter what - which is true
+		// for some files, like .dockerignore and Dockerfile (sometimes)
+		if include != relFilePath {
+			skip, err = fileutils.OptimizedMatches(relFilePath, patterns, patDirs)
+			if err != nil {
+				logrus.Debugf("Error matching %s", relFilePath, err)
+				return err
+			}
+		}
+
+		if skip {
+			if !exceptions && f.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		if seen[relFilePath] {
+			return nil
+		}
+		seen[relFilePath] = true
+
+		// Rename the base resource
+		if options.Name != "" && filePath == srcPath+"/"+filepath.Base(relFilePath) {
+			renamedRelFilePath = relFilePath
+		}
+		// Set this to make sure the items underneath also get renamed
+		if options.Name != "" {
+			relFilePath = strings.Replace(relFilePath, renamedRelFilePath, options.Name, 1)
+		}
+
+		// --
+		fi, err := os.Lstat(filePath)
+		if err == nil && fi.Mode()&os.ModeSymlink != 0 {
+			newFilePath, err := filepath.EvalSymlinks(filePath)
+			if err != nil {
+				// skip bad file
+				return nil
+			}
+
+			newFilePath = filepath.Clean(newFilePath)
+			fi, err = os.Stat(newFilePath)
+			if err != nil {
+				// Skip bad link files
+				return nil
+			}
+
+			// If out of the context convert it from link to file
+			if !strings.HasPrefix(newFilePath, fi.Name()) {
+				filePath = newFilePath
+			}
+			if fi.IsDir() {
+				walkArchiveAppend(ta, options, seen, filePath, ".", fmt.Sprintf("%s/", relFilePath))
+			}
+		}
+		// --
+
+		if err := ta.addTarFile(filePath, fmt.Sprintf("%s%s", rootDir, relFilePath)); err != nil {
+			logrus.Debugf("Can't add file %s to tar: %s", filePath, err)
+		}
+		return nil
+	})
+
 }
 
 func Unpack(decompressedArchive io.Reader, dest string, options *TarOptions) error {

@@ -367,7 +367,6 @@ func calcCopyInfo(b *Builder, cmdName string, cInfos *[]*copyInfo, origPath stri
 	}
 
 	// Must be a dir or a file
-
 	if err := b.checkPathForAddition(origPath); err != nil {
 		return err
 	}
@@ -379,6 +378,18 @@ func calcCopyInfo(b *Builder, cmdName string, cInfos *[]*copyInfo, origPath stri
 	ci.destPath = destPath
 	ci.decompress = allowDecompression
 	*cInfos = append(*cInfos, &ci)
+
+	if fi2, _ := os.Lstat(path.Join(b.contextPath, origPath)); fi2.Mode()&os.ModeSymlink == os.ModeSymlink {
+		origPath, err := filepath.EvalSymlinks(path.Join(b.contextPath, origPath))
+		if err != nil {
+			return fmt.Errorf("Reading link failed for %q: %v", origPath, err)
+		}
+		if ci.origPath, err = filepath.Rel(b.contextPath, origPath); err != nil {
+			fmt.Println("SRINI cp, op and rel", b.contextPath, ",", origPath, ",", ci.origPath)
+			return fmt.Errorf("Reading link failed for %q: %v", origPath, err)
+		}
+		ci.hash = ci.origPath
+	}
 
 	// Deal with the single file case
 	if !fi.IsDir() {

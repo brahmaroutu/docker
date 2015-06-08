@@ -1,3 +1,5 @@
+//+build linux,!ppc64le,!s390x
+
 package netns
 
 const (

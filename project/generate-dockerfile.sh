@@ -34,13 +34,13 @@ EOF
 
 if [ "$ARCH" == "s390x" ] ; then
 	cat <<-'EOF'
-		FROM ibmcom/gccgo_z:latest
+		FROM ibmcom/gccgo_s390x:latest
 		ENV CGO_ENABLED 1
 		ENV USE_GCCGO  1
 	EOF
 elif [ "$ARCH" == "ppc64le" ] ; then
 	cat <<-'EOF'
-		FROM ibmcom/gccgo_p:latest
+		FROM ibmcom/gccgo-ppc64le:latest
 		ENV CGO_ENABLED 1
 		ENV USE_GCCGO  1
 	EOF
@@ -220,10 +220,9 @@ RUN set -x \
        && rm -rf "$GOPATH"
 
 # Get the "docker-py" source so we can run their integration tests
-ENV DOCKER_PY_COMMIT 91985b239764fe54714fa0a93d52aa362357d251
-RUN git clone https://github.com/docker/docker-py.git /docker-py \
+RUN git clone https://github.com/brahmaroutu/docker-py.git /docker-py \
        && cd /docker-py \
-       && git checkout -q $DOCKER_PY_COMMIT
+       && git checkout -b power_z_hack
 
 # Setup s3cmd config
 RUN { \
@@ -254,9 +253,9 @@ if [ "$ARCH" == "ppc64le" ]; then
 		# Get useful and necessary Hub images so we can "docker load" locally instead of pulling
 		COPY contrib/download-frozen-image.sh /go/src/github.com/docker/docker/contrib/
 		RUN ./contrib/download-frozen-image.sh /docker-frozen-images \
-		         ibmcom/busybox_p:latest \
-		         ibmcom/hello-world_p:frozen \
-		         ibmcom/unshare_p:latest
+		         ibmcom/busybox-ppc64le:latest \
+		         ibmcom/hello-world-ppc64le:frozen \
+		         ibmcom/unshare-ppc64le:latest
 		# see also "hack/make/.ensure-frozen-images" (which needs to be updated any time this list is)
 	EOF
 elif [ "$ARCH" == "s390x" ]; then
@@ -264,9 +263,9 @@ elif [ "$ARCH" == "s390x" ]; then
 		# Get useful and necessary Hub images so we can "docker load" locally instead of pulling
 		COPY contrib/download-frozen-image.sh /go/src/github.com/docker/docker/contrib/
 		RUN ./contrib/download-frozen-image.sh /docker-frozen-images \
-		         ibmcom/busybox_z:latest \
-		         ibmcom/hello-world_z:frozen \
-		         ibmcom/unshare_z:latest
+		         ibmcom/busybox-s390x:latest \
+		         ibmcom/hello-world-s390x:frozen \
+		         ibmcom/unshare-s390x:latest
 		# see also "hack/make/.ensure-frozen-images" (which needs to be updated any time this list is)
 	EOF
 else

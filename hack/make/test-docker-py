@@ -4,6 +4,8 @@ set -e
 # subshell so that we can export PATH without breaking other things
 (
 	bundle .integration-daemon-start
+	bundle .ensure-frozen-images
+	bundle .ensure-images
 
 	dockerPy='/docker-py'
 	[ -d "$dockerPy" ] || {

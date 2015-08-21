@@ -41,28 +41,28 @@ all: build
 	$(DOCKER_RUN_DOCKER) hack/make.sh
 
 binary: build
-	$(DOCKER_RUN_DOCKER) hack/make.sh binary
+	$(DOCKER_RUN_DOCKER) hack/make.sh gccgo
 
 cross: build
-	$(DOCKER_RUN_DOCKER) hack/make.sh binary cross
+	$(DOCKER_RUN_DOCKER) hack/make.sh gccgo cross
 
 deb: build
-	$(DOCKER_RUN_DOCKER) hack/make.sh binary build-deb
+	$(DOCKER_RUN_DOCKER) hack/make.sh gccgo build-deb
 
 rpm: build
-	$(DOCKER_RUN_DOCKER) hack/make.sh binary build-rpm
+	$(DOCKER_RUN_DOCKER) hack/make.sh gccgo build-rpm
 
 test: build
-	$(DOCKER_RUN_DOCKER) hack/make.sh binary cross test-unit test-integration-cli test-docker-py
+	$(DOCKER_RUN_DOCKER) hack/make.sh gccgo cross test-unit test-integration-cli test-docker-py
 
 test-unit: build
 	$(DOCKER_RUN_DOCKER) hack/make.sh test-unit
 
 test-integration-cli: build
-	$(DOCKER_RUN_DOCKER) hack/make.sh binary test-integration-cli
+	$(DOCKER_RUN_DOCKER) hack/make.sh gccgo test-integration-cli
 
 test-docker-py: build
-	$(DOCKER_RUN_DOCKER) hack/make.sh binary test-docker-py
+	$(DOCKER_RUN_DOCKER) hack/make.sh gccgo test-docker-py
 
 validate: build
 	$(DOCKER_RUN_DOCKER) hack/make.sh validate-dco validate-gofmt validate-pkg validate-lint validate-test validate-toml validate-vet

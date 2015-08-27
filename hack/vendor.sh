@@ -43,13 +43,14 @@ clone git github.com/endophage/gotuf a592b03b28b02bb29bb5878308fb1abed63383b5
 clone git github.com/tent/canonical-json-go 96e4ba3a7613a1216cbd1badca4efe382adea337
 clone git github.com/agl/ed25519 d2b94fd789ea21d12fac1a4443dd3a3f79cda72c
 
-clone git github.com/opencontainers/runc v0.0.3 # libcontainer
+clone git github.com/opencontainers/runc 2ee6d1e8b6cf6a1e6009b71844f4fa2325d824a1
 # libcontainer deps (see src/github.com/docker/libcontainer/update-vendor.sh)
 clone git github.com/coreos/go-systemd v3
 clone git github.com/godbus/dbus v2
 clone git github.com/syndtr/gocapability 66ef2aa7a23ba682594e2b6f74cf40c0692b49fb
 clone git github.com/golang/protobuf 655cdfa588ea
 clone git github.com/Graylog2/go-gelf 6c62a85f1d47a67f2a5144c0e745b325889a8120
+clone git github.com/seccomp/libseccomp-golang 1b506fc7c24eec5a3693cdcbed40d9c226cfc6a1
 
 clone git github.com/fluent/fluent-logger-golang v1.0.0
 # fluent-logger-golang deps

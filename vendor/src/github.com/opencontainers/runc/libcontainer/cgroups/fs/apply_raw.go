@@ -83,7 +83,7 @@ type data struct {
 	pid    int
 }
 
-func (m *Manager) Apply(pid int) error {
+func (m *Manager) Apply(pid int) (err error) {
 	if m.Cgroups == nil {
 		return nil
 	}
@@ -236,7 +236,7 @@ func getCgroupData(c *configs.Cgroup, pid int) (*data, error) {
 }
 
 func (raw *data) parent(subsystem, mountpoint, src string) (string, error) {
-	initPath, err := cgroups.GetInitCgroupDir(subsystem)
+	initPath, err := cgroups.GetThisCgroupDir(subsystem)
 	if err != nil {
 		return "", err
 	}

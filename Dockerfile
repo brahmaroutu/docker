@@ -46,6 +46,8 @@ RUN apt-get update && apt-get install -y \
 	libapparmor-dev \
 	libcap-dev \
 	libsqlite3-dev \
+	libtool \
+	libseccomp-dev \
 	mercurial \
 	parallel \
 	python-mock \
@@ -79,6 +81,16 @@ RUN cd /usr/src/lxc \
 	&& make \
 	&& make install \
 	&& ldconfig
+
+ENV LIB_SECCOMP_COMMIT 7932b4fa24c1add0d7a315de8387d216334fbcf7
+RUN set -x \
+	&& export SECCOMPPATH="$(mktemp -d)" \
+	&& git clone https://github.com/seccomp/libseccomp.git "$SECCOMPPATH/src/github.com/seccomp/libseccomp" \
+	&& cd $SECCOMPPATH/src/github.com/seccomp/libseccomp \
+	&& git checkout -q $LIB_SECCOMP_COMMIT && ./autogen.sh \
+	&& sed -i -e 's/AC_INIT\(\[libseccomp\]\, \[(.*)\]\)/AC_INIT\(\[libseccomp\], \1\)/g' configure.ac \
+	&& ./configure && make && make install \
+	&& rm -rf "$SECCOMPPATH"
 
 # Install Go
 ENV GO_VERSION 1.4.2
@@ -210,6 +222,7 @@ RUN set -x \
     && cd /go/src/github.com/akavel/rsrc \
     && git checkout -q $RSRC_COMMIT \
     && go install -v
+
 
 # Wrap all commands in the "docker-in-docker" script to allow nested containers
 ENTRYPOINT ["hack/dind"]
